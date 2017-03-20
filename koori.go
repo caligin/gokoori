@@ -20,9 +20,14 @@ type PipelineGroup struct {
 	Pipelines []Pipeline
 }
 
-func pause(client *http.Client, pipeline string, reason string) {
+type GoApi struct {
+	Host string
+	Port uint
+}
+
+func pause(client *http.Client, api GoApi, pipeline string, reason string) {
 	// TODO make sure reason has the proper encoding? req splitting? (but impact?? like, nope really)
-	req, makeReqErr := http.NewRequest("POST", fmt.Sprintf("http://localhost:32771/go/api/pipelines/%s/pause", pipeline), strings.NewReader(fmt.Sprintf("pauseCause=%s", reason)))
+	req, makeReqErr := http.NewRequest("POST", fmt.Sprintf("http://%s:%d/go/api/pipelines/%s/pause", api.Host, api.Port, pipeline), strings.NewReader(fmt.Sprintf("pauseCause=%s", reason)))
 	if makeReqErr != nil {
 		panic(fmt.Sprintf("error creating pause req for %s: %s", pipeline, makeReqErr.Error()))
 	}
@@ -36,8 +41,8 @@ func pause(client *http.Client, pipeline string, reason string) {
 	}
 }
 
-func unpause(client *http.Client, pipeline string) {
-	req, makeReqErr := http.NewRequest("POST", fmt.Sprintf("http://localhost:32771/go/api/pipelines/%s/unpause", pipeline), nil)
+func unpause(client *http.Client, api GoApi, pipeline string) {
+	req, makeReqErr := http.NewRequest("POST", fmt.Sprintf("http://%s:%d/go/api/pipelines/%s/unpause", api.Host, api.Port, pipeline), nil)
 	if makeReqErr != nil {
 		panic(fmt.Sprintf("error creating unpause req for %s: %s", pipeline, makeReqErr.Error()))
 	}
@@ -51,8 +56,8 @@ func unpause(client *http.Client, pipeline string) {
 	}
 }
 
-func listGroups(client *http.Client) []PipelineGroup {
-	pgResp, pgErr := client.Get("http://localhost:32771/go/api/config/pipeline_groups")
+func listGroups(client *http.Client, api GoApi) []PipelineGroup {
+	pgResp, pgErr := client.Get(fmt.Sprintf("http://%s:%d/go/api/config/pipeline_groups", api.Host, api.Port))
 	if pgErr != nil {
 		panic(fmt.Sprintf("error getting pipeline groups: %s", pgErr.Error()))
 	}
@@ -78,14 +83,17 @@ func main() {
 	// TODO quiet flag ?
 	var nameFilter = flag.String("name", ".+", "Filter by pipeline name (regex)")
 	var reason = flag.String("reason", "Paused by Gokoori", "Reason for pausing")
+	var host = flag.String("host", "localhost", "Host hunning the go server")
+	var port = flag.Uint("port", 8153, "Port the go server is running on")
 	flag.Parse()
 	if *isPause && *isUnpause {
 		panic("Both pause and unpause are specified, those two options cannot be used together")
 	}
+	api := GoApi{*host, *port}
 
 	client := &http.Client{}
 
-	pipelineGroups := listGroups(client)
+	pipelineGroups := listGroups(client, api)
 
 	for _, group := range pipelineGroups {
 		for _, pipeline := range group.Pipelines {
@@ -96,10 +104,10 @@ func main() {
 			if match {
 				fmt.Println(pipeline.Name)
 				if *isUnpause {
-					unpause(client, pipeline.Name)
+					unpause(client, api, pipeline.Name)
 				}
 				if *isPause {
-					pause(client, pipeline.Name, *reason)
+					pause(client, api, pipeline.Name, *reason)
 				}
 			}
 		}
