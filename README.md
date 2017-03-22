@@ -40,8 +40,12 @@ The file is in JSON format and should contain an object with the fields `usernam
 
 `make docker`
 
+## Contributing
+
+- PRs welcome!
+- I deliberately wrote code without studying golang properly to try and have a crash-course, if you have any comments, suggestions or insults open an issue or ping me on twitter!
+
 ## TODOs
 
-- auth is not supported yet
 - tls is not supported yet
 - tests. doing none for now was 100% a conscious decision
