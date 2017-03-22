@@ -10,7 +10,7 @@ Will query all available pipelines from `localhost:8153` with no filter and prin
 
 ### Authentication
 
-Gokoori will read credentials form a file named `~/.gokoori/credentials` and use them automatically ffor basic auth, if the file is present.
+Gokoori will read credentials form a file named `~/.gokoori/credentials` and use them automatically for basic auth, if the file is present.
 
 The file is in JSON format and should contain an object with the fields `username` and `password`, like this:
 
@@ -35,6 +35,10 @@ The file is in JSON format and should contain an object with the fields `usernam
 ## Build
 
 `make`
+
+## Run the playground gocd server
+
+`make docker`
 
 ## TODOs
 
