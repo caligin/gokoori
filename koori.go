@@ -6,9 +6,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
+	"os/user"
+	"path"
 	"regexp"
 	"strings"
 )
+
+const credentialsFileRelative = ".gokoori/credentials"
 
 type Pipeline struct {
 	Name string
@@ -25,41 +30,62 @@ type GoApi struct {
 	Port uint
 }
 
-func pause(client *http.Client, api GoApi, pipeline string, reason string) {
+type Credentials struct {
+	Username string
+	Password string
+}
+
+func pause(client *http.Client, api GoApi, credentials *Credentials, pipeline string, reason string) {
 	// TODO make sure reason has the proper encoding? req splitting? (but impact?? like, nope really)
 	req, makeReqErr := http.NewRequest("POST", fmt.Sprintf("http://%s:%d/go/api/pipelines/%s/pause", api.Host, api.Port, pipeline), strings.NewReader(fmt.Sprintf("pauseCause=%s", reason)))
 	if makeReqErr != nil {
 		panic(fmt.Sprintf("error creating pause req for %s: %s", pipeline, makeReqErr.Error()))
 	}
 	req.Header.Add("Confirm", "true")
+	if credentials != nil {
+		req.SetBasicAuth(credentials.Username, credentials.Password)
+	}
 	pauseResp, pauseErr := client.Do(req)
 	if pauseErr != nil {
 		panic(fmt.Sprintf("error pausing %s: %s", pipeline, pauseErr.Error()))
 	}
 	if pauseResp.StatusCode != 200 {
-		panic(fmt.Sprintf("failed pausing %s, expected 200 got %s", pipeline, pauseResp.StatusCode))
+		panic(fmt.Sprintf("failed pausing %s, expected 200 got %d", pipeline, pauseResp.StatusCode))
 	}
 }
 
-func unpause(client *http.Client, api GoApi, pipeline string) {
+func unpause(client *http.Client, api GoApi, credentials *Credentials, pipeline string) {
 	req, makeReqErr := http.NewRequest("POST", fmt.Sprintf("http://%s:%d/go/api/pipelines/%s/unpause", api.Host, api.Port, pipeline), nil)
 	if makeReqErr != nil {
 		panic(fmt.Sprintf("error creating unpause req for %s: %s", pipeline, makeReqErr.Error()))
 	}
 	req.Header.Add("Confirm", "true")
+	if credentials != nil {
+		req.SetBasicAuth(credentials.Username, credentials.Password)
+	}
 	unpauseResp, unpauseErr := client.Do(req)
 	if unpauseErr != nil {
 		panic(fmt.Sprintf("error unpausing %s: %s", pipeline, unpauseErr.Error()))
 	}
 	if unpauseResp.StatusCode != 200 {
-		panic(fmt.Sprintf("failed unpausing %s, expected 200 got %s", pipeline, unpauseResp.StatusCode))
+		panic(fmt.Sprintf("failed unpausing %s, expected 200 got %d", pipeline, unpauseResp.StatusCode))
 	}
 }
 
-func listGroups(client *http.Client, api GoApi) []PipelineGroup {
-	pgResp, pgErr := client.Get(fmt.Sprintf("http://%s:%d/go/api/config/pipeline_groups", api.Host, api.Port))
+func listGroups(client *http.Client, api GoApi, credentials *Credentials) []PipelineGroup {
+	req, makeReqErr := http.NewRequest("GET", fmt.Sprintf("http://%s:%d/go/api/config/pipeline_groups", api.Host, api.Port), nil)
+	if makeReqErr != nil {
+		panic(fmt.Sprintf("error creating list pipeline error: %s", makeReqErr.Error()))
+	}
+	if credentials != nil {
+		req.SetBasicAuth(credentials.Username, credentials.Password)
+	}
+	pgResp, pgErr := client.Do(req)
 	if pgErr != nil {
 		panic(fmt.Sprintf("error getting pipeline groups: %s", pgErr.Error()))
+	}
+	if pgResp.StatusCode != 200 {
+		panic(fmt.Sprintf("failed listing pipeline groups, expected 200 got %d", pgResp.StatusCode))
 	}
 	defer pgResp.Body.Close()
 	pgBody, pgBodyReadErr := ioutil.ReadAll(pgResp.Body)
@@ -69,9 +95,28 @@ func listGroups(client *http.Client, api GoApi) []PipelineGroup {
 	var pipelineGroups []PipelineGroup
 	pgUnmarshalErr := json.Unmarshal(pgBody, &pipelineGroups)
 	if pgUnmarshalErr != nil {
-		panic(fmt.Sprintf("error unmarshaling pipeline groups: %s", pgBodyReadErr.Error()))
+		panic(fmt.Sprintf("error unmarshaling pipeline groups: %s", pgUnmarshalErr.Error()))
 	}
 	return pipelineGroups
+}
+
+func readCredentials() *Credentials {
+	// TODO bomb if file is world-readable/writable, like ssh for keys.
+	user, _ := user.Current()
+	homedir := user.HomeDir
+	contents, err := ioutil.ReadFile(path.Join(homedir, credentialsFileRelative))
+	if err != nil && os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		panic(fmt.Sprintf("error opening credentials file", err.Error()))
+	}
+	var credentials Credentials
+	jsonErr := json.Unmarshal(contents, &credentials)
+	if jsonErr != nil {
+		panic(fmt.Sprintf("error unmarshaling credentials: %s", jsonErr.Error()))
+	}
+	return &credentials
 }
 
 func main() {
@@ -93,7 +138,9 @@ func main() {
 
 	client := &http.Client{}
 
-	pipelineGroups := listGroups(client, api)
+	credentials := readCredentials()
+
+	pipelineGroups := listGroups(client, api, credentials)
 
 	for _, group := range pipelineGroups {
 		for _, pipeline := range group.Pipelines {
@@ -104,10 +151,10 @@ func main() {
 			if match {
 				fmt.Println(pipeline.Name)
 				if *isUnpause {
-					unpause(client, api, pipeline.Name)
+					unpause(client, api, credentials, pipeline.Name)
 				}
 				if *isPause {
-					pause(client, api, pipeline.Name, *reason)
+					pause(client, api, credentials, pipeline.Name, *reason)
 				}
 			}
 		}
