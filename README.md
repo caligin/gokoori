@@ -1,5 +1,7 @@
 # gokoori
 
+[![Build Status](https://travis-ci.org/caligin/gokoori.svg?branch=master)](https://travis-ci.org/caligin/gokoori)
+
 A small `find`-like cli to mass pause/unpause [gocd](https://www.gocd.io/) pipelines.
 
 ## Usage
