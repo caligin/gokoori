@@ -26,6 +26,7 @@ type PipelineGroup struct {
 }
 
 type GoApi struct {
+	Protocol string
 	Host string
 	Port uint
 }
@@ -37,7 +38,7 @@ type Credentials struct {
 
 func pause(client *http.Client, api GoApi, credentials *Credentials, pipeline string, reason string) {
 	// TODO make sure reason has the proper encoding? req splitting? (but impact?? like, nope really)
-	req, makeReqErr := http.NewRequest("POST", fmt.Sprintf("http://%s:%d/go/api/pipelines/%s/pause", api.Host, api.Port, pipeline), strings.NewReader(fmt.Sprintf("pauseCause=%s", reason)))
+	req, makeReqErr := http.NewRequest("POST", fmt.Sprintf("%s://%s:%d/go/api/pipelines/%s/pause", api.Protocol, api.Host, api.Port, pipeline), strings.NewReader(fmt.Sprintf("pauseCause=%s", reason)))
 	if makeReqErr != nil {
 		panic(fmt.Sprintf("error creating pause req for %s: %s", pipeline, makeReqErr.Error()))
 	}
@@ -55,7 +56,7 @@ func pause(client *http.Client, api GoApi, credentials *Credentials, pipeline st
 }
 
 func unpause(client *http.Client, api GoApi, credentials *Credentials, pipeline string) {
-	req, makeReqErr := http.NewRequest("POST", fmt.Sprintf("http://%s:%d/go/api/pipelines/%s/unpause", api.Host, api.Port, pipeline), nil)
+	req, makeReqErr := http.NewRequest("POST", fmt.Sprintf("%s://%s:%d/go/api/pipelines/%s/unpause", api.Protocol, api.Host, api.Port, pipeline), nil)
 	if makeReqErr != nil {
 		panic(fmt.Sprintf("error creating unpause req for %s: %s", pipeline, makeReqErr.Error()))
 	}
@@ -73,7 +74,7 @@ func unpause(client *http.Client, api GoApi, credentials *Credentials, pipeline 
 }
 
 func listGroups(client *http.Client, api GoApi, credentials *Credentials) []PipelineGroup {
-	req, makeReqErr := http.NewRequest("GET", fmt.Sprintf("http://%s:%d/go/api/config/pipeline_groups", api.Host, api.Port), nil)
+	req, makeReqErr := http.NewRequest("GET", fmt.Sprintf("%s://%s:%d/go/api/config/pipeline_groups", api.Protocol, api.Host, api.Port), nil)
 	if makeReqErr != nil {
 		panic(fmt.Sprintf("error creating list pipeline error: %s", makeReqErr.Error()))
 	}
@@ -123,18 +124,31 @@ func main() {
 	//TODO don't pause an already paused as it would ovewrite the pause message? does it even matter?
 	//TODO urlencode those url interpolations
 
+	const defaultHttpsPort uint = 8154
+	const defaultHttpPort uint = 8153
+
 	var isPause = flag.Bool("pause", false, "Unpause matching pipelines")
 	var isUnpause = flag.Bool("unpause", false, "Unpause matching pipelines")
-	// TODO quiet flag ?
+
 	var nameFilter = flag.String("name", ".+", "Filter by pipeline name (regex)")
 	var reason = flag.String("reason", "Paused by Gokoori", "Reason for pausing")
 	var host = flag.String("host", "localhost", "Host hunning the go server")
-	var port = flag.Uint("port", 8153, "Port the go server is running on")
+	var port = flag.Uint("port", defaultHttpsPort, "Port the go server is running on")
+	var insecure = flag.Bool("insecure", false, "Use HTTP plain instead of HTTPS")
+
 	flag.Parse()
 	if *isPause && *isUnpause {
 		panic("Both pause and unpause are specified, those two options cannot be used together")
 	}
-	api := GoApi{*host, *port}
+	if *insecure && (*port == defaultHttpsPort) {
+		// TODO this means that if someone specifies the defaultHttpsPort explicitly we can't yet detect it and just override it with defaultHttpPort...
+		*port = defaultHttpPort
+	}
+	var protocol = "https"
+	if *insecure {
+		protocol = "http"
+	}
+	api := GoApi{protocol, *host, *port}
 
 	client := &http.Client{}
 

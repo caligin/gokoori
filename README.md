@@ -8,7 +8,7 @@ A small `find`-like cli to mass pause/unpause [gocd](https://www.gocd.io/) pipel
 
 `./gokoori [options]`
 
-Will query all available pipelines from `localhost:8153` with no filter and print their names.
+Will query all available pipelines from `https://localhost:8154` with no filter and print their names.
 
 ### Authentication
 
@@ -32,7 +32,8 @@ The file is in JSON format and should contain an object with the fields `usernam
 #### Config
 - `--reason <reason>`: specifies a reason to use for the `--pause` action. Ignored when `--pause` is not specified.
 - `--host`: the hostname or ip where the gocd server is running. Defaults to localhost.
-- `--port`: the port on which the gocd server is running on. Defaults to 8153.
+- `--port`: the port on which the gocd server is running on. Defaults to 8154, or 8153 when the `--insecure` option is specified.
+- `--insecure`: uses HTTP plain instead of https. Causes the port to default to 8153 if not explicitly set.
 
 ## Build
 
@@ -49,5 +50,4 @@ The file is in JSON format and should contain an object with the fields `usernam
 
 ## TODOs
 
-- tls is not supported yet
 - tests. doing none for now was 100% a conscious decision
