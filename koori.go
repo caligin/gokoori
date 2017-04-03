@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"os/user"
@@ -40,7 +41,7 @@ func pause(client *http.Client, api GoApi, credentials *Credentials, pipeline st
 	// TODO make sure reason has the proper encoding? req splitting? (but impact?? like, nope really)
 	req, makeReqErr := http.NewRequest("POST", fmt.Sprintf("%s://%s:%d/go/api/pipelines/%s/pause", api.Protocol, api.Host, api.Port, pipeline), strings.NewReader(fmt.Sprintf("pauseCause=%s", reason)))
 	if makeReqErr != nil {
-		panic(fmt.Sprintf("error creating pause req for %s: %s", pipeline, makeReqErr.Error()))
+		log.Fatalf("error creating pause req for %s: %s", pipeline, makeReqErr.Error())
 	}
 	req.Header.Add("Confirm", "true")
 	if credentials != nil {
@@ -48,17 +49,17 @@ func pause(client *http.Client, api GoApi, credentials *Credentials, pipeline st
 	}
 	pauseResp, pauseErr := client.Do(req)
 	if pauseErr != nil {
-		panic(fmt.Sprintf("error pausing %s: %s", pipeline, pauseErr.Error()))
+		log.Fatalf("error pausing %s: %s", pipeline, pauseErr.Error())
 	}
 	if pauseResp.StatusCode != 200 {
-		panic(fmt.Sprintf("failed pausing %s, expected 200 got %d", pipeline, pauseResp.StatusCode))
+		log.Fatalf("failed pausing %s, expected 200 got %d", pipeline, pauseResp.StatusCode)
 	}
 }
 
 func unpause(client *http.Client, api GoApi, credentials *Credentials, pipeline string) {
 	req, makeReqErr := http.NewRequest("POST", fmt.Sprintf("%s://%s:%d/go/api/pipelines/%s/unpause", api.Protocol, api.Host, api.Port, pipeline), nil)
 	if makeReqErr != nil {
-		panic(fmt.Sprintf("error creating unpause req for %s: %s", pipeline, makeReqErr.Error()))
+		log.Fatalf("error creating unpause req for %s: %s", pipeline, makeReqErr.Error())
 	}
 	req.Header.Add("Confirm", "true")
 	if credentials != nil {
@@ -66,37 +67,37 @@ func unpause(client *http.Client, api GoApi, credentials *Credentials, pipeline 
 	}
 	unpauseResp, unpauseErr := client.Do(req)
 	if unpauseErr != nil {
-		panic(fmt.Sprintf("error unpausing %s: %s", pipeline, unpauseErr.Error()))
+		log.Fatalf("error unpausing %s: %s", pipeline, unpauseErr.Error())
 	}
 	if unpauseResp.StatusCode != 200 {
-		panic(fmt.Sprintf("failed unpausing %s, expected 200 got %d", pipeline, unpauseResp.StatusCode))
+		log.Fatalf("failed unpausing %s, expected 200 got %d", pipeline, unpauseResp.StatusCode)
 	}
 }
 
 func listGroups(client *http.Client, api GoApi, credentials *Credentials) []PipelineGroup {
 	req, makeReqErr := http.NewRequest("GET", fmt.Sprintf("%s://%s:%d/go/api/config/pipeline_groups", api.Protocol, api.Host, api.Port), nil)
 	if makeReqErr != nil {
-		panic(fmt.Sprintf("error creating list pipeline error: %s", makeReqErr.Error()))
+		log.Fatalf("error creating list pipeline error: %s", makeReqErr.Error())
 	}
 	if credentials != nil {
 		req.SetBasicAuth(credentials.Username, credentials.Password)
 	}
 	pgResp, pgErr := client.Do(req)
 	if pgErr != nil {
-		panic(fmt.Sprintf("error getting pipeline groups: %s", pgErr.Error()))
+		log.Fatalf("error getting pipeline groups: ", pgErr.Error())
 	}
 	if pgResp.StatusCode != 200 {
-		panic(fmt.Sprintf("failed listing pipeline groups, expected 200 got %d", pgResp.StatusCode))
+		log.Fatalf("failed listing pipeline groups, expected 200 got %d", pgResp.StatusCode)
 	}
 	defer pgResp.Body.Close()
 	pgBody, pgBodyReadErr := ioutil.ReadAll(pgResp.Body)
 	if pgBodyReadErr != nil {
-		panic(fmt.Sprintf("error reading pipeline groups: %s", pgBodyReadErr.Error()))
+		log.Fatalf("error reading pipeline groups: %s", pgBodyReadErr.Error())
 	}
 	var pipelineGroups []PipelineGroup
 	pgUnmarshalErr := json.Unmarshal(pgBody, &pipelineGroups)
 	if pgUnmarshalErr != nil {
-		panic(fmt.Sprintf("error unmarshaling pipeline groups: %s", pgUnmarshalErr.Error()))
+		log.Fatalf("error unmarshaling pipeline groups: %s", pgUnmarshalErr.Error())
 	}
 	return pipelineGroups
 }
@@ -110,12 +111,12 @@ func readCredentials() *Credentials {
 		return nil
 	}
 	if err != nil {
-		panic(fmt.Sprintf("error opening credentials file", err.Error()))
+		log.Fatalf("error opening credentials file", err.Error())
 	}
 	var credentials Credentials
 	jsonErr := json.Unmarshal(contents, &credentials)
 	if jsonErr != nil {
-		panic(fmt.Sprintf("error unmarshaling credentials: %s", jsonErr.Error()))
+		log.Fatalf("error unmarshaling credentials: %s", jsonErr.Error())
 	}
 	return &credentials
 }
@@ -138,7 +139,7 @@ func main() {
 
 	flag.Parse()
 	if *isPause && *isUnpause {
-		panic("Both pause and unpause are specified, those two options cannot be used together")
+		log.Fatalf("Both pause and unpause are specified, those two options cannot be used together")
 	}
 	if *insecure && (*port == defaultHttpsPort) {
 		// TODO this means that if someone specifies the defaultHttpsPort explicitly we can't yet detect it and just override it with defaultHttpPort...
@@ -160,7 +161,7 @@ func main() {
 		for _, pipeline := range group.Pipelines {
 			match, matchErr := regexp.MatchString(*nameFilter, pipeline.Name)
 			if matchErr != nil {
-				panic(fmt.Sprintf("error regexing %s: %s", pipeline.Name, matchErr))
+				log.Fatalf("error regexing %s: %s", pipeline.Name, matchErr)
 			}
 			if match {
 				fmt.Println(pipeline.Name)
