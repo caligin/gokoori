@@ -6,7 +6,9 @@ deploy:
   provider: releases
   api_key:
     secure: m+EyYfzDFaWSHPNABbL61crR745IUOmH53f84Y8kXuiGakbcFyCyrEitg9B5XeolwR6NUuMKWVy8I09zN/RwdEG2ojdC8Q3C7e/KuPojXPvClFl8VmOH9tusBUWes/p2jxb3tGS96xpvjzbk9mEKpXRBQJvbKq26LI41Ydw+DNjF5urhkyECh+sLTIMAs+LylFyMsZV2qPEXuu8+hQi2ZxDfp7yb7hX3eNcNiBcXKQnw6qFZ1G4/ill3OKhNFswiSmMmZNN8+vPtCeVOrZy+cb89KoLbs2mtf4THtk/fS6xU/gweuuFJHO1rlcp/HZkWHQ2VIyEVcjh6DYnHDlip9gRKuEJpncZOgm3rfhKKf59/6yYTwsfYOB5PSD/0TLd9/NLENH9pRqtZokKO8brdwDW+L/M5+qh3NBAySPtEv+autnBu/X83Fdy6hquHCEoDIdsmCsx2jZ/0Q1UZo1NopNr71V6dBCjPhrS7WPAW4MahxIaHoqkR8M7wXuu1CtAUeZarA2EVGXpqt6S1gjvO3luyMu4mgnPcXYQ06KYQy4WM6Y4JMpIyPa5P6u97WQN98fqL42I7Xc+wIMrAwRFrSE3hL04WceRIcnBwLx1dieNkH6a+tzqAs2I8mmToqd24NQoKad/MAxSDBSAM1lYPOIB28jdsraVUm8lFMWxQYes=
-  file: gokoori
+  file: 
+    - gokoori
+    - gokoori.exe
   skip_cleanup: true
   on:
     tags: true
