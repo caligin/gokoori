@@ -39,7 +39,7 @@ type Pipeline struct {
 	Name string
 	Locked bool
 	PauseInfo PauseInfo `json:"pause_info"`
-	Embedded PipelineEmbedded
+	Embedded PipelineEmbedded `json:"_embedded"`
 }
 
 type PauseInfo struct {
@@ -136,6 +136,18 @@ func schedule(client *http.Client, api GoApi, credentials *Credentials, pipeline
 	}
 }
 
+func isFailed(pipeline *Pipeline) bool {
+	if len(pipeline.Embedded.Instances) == 0 {
+		return false
+	}
+	for _, stage := range pipeline.Embedded.Instances[0].Embedded.Stages {
+		if stage.Status == "Failed" {
+			return true
+		}
+	}
+	return false
+}
+
 func dashboard(client *http.Client, api GoApi, credentials *Credentials) Dashboard {
 	req, makeReqErr := http.NewRequest("GET", fmt.Sprintf("%s://%s:%d/go/api/dashboard", api.Protocol, api.Host, api.Port), nil)
 	if makeReqErr != nil {
@@ -196,6 +208,9 @@ func main() {
 	var isSchedule = flag.Bool("schedule", false, "Schedule matching pipelines")
 
 	var nameFilter = flag.String("name", ".+", "Filter by pipeline name (regex)")
+	var groupFilter = flag.String("groupname", ".+", "Filter by group name (regex)")
+	var matchFailed = flag.Bool("failed", false, "Match failed pipelines only")
+	var matchPaused = flag.Bool("paused", false, "Match paused pipelines only")
 	var reason = flag.String("reason", "Paused by Gokoori", "Reason for pausing")
 	var host = flag.String("host", "localhost", "Host hunning the go server")
 	var port = flag.Uint("port", defaultHttpsPort, "Port the go server is running on")
@@ -223,22 +238,36 @@ func main() {
 	dashboard := dashboard(client, api, credentials)
 
 	for _, group := range dashboard.Embedded.PipelineGroups {
+		match, matchErr := regexp.MatchString(*groupFilter, group.Name)
+		if matchErr != nil {
+			log.Fatalf("error regexing %s: %s", group.Name, matchErr)
+		}
+		if !match {
+			continue
+		}
 		for _, pipeline := range group.Embedded.Pipelines {
 			match, matchErr := regexp.MatchString(*nameFilter, pipeline.Name)
 			if matchErr != nil {
 				log.Fatalf("error regexing %s: %s", pipeline.Name, matchErr)
 			}
-			if match {
-				fmt.Println(pipeline.Name)
-				if *isUnpause {
-					unpause(client, api, credentials, pipeline.Name)
-				}
-				if *isPause {
-					pause(client, api, credentials, pipeline.Name, *reason)
-				}
-				if *isSchedule {
-					schedule(client, api, credentials, pipeline.Name)
-				}
+			if !match {
+				continue
+			}
+			if *matchFailed && !isFailed(&pipeline) {
+				continue
+			}
+			if *matchPaused && !pipeline.PauseInfo.Paused {
+				continue
+			}
+			fmt.Println(pipeline.Name)
+			if *isUnpause {
+				unpause(client, api, credentials, pipeline.Name)
+			}
+			if *isPause {
+				pause(client, api, credentials, pipeline.Name, *reason)
+			}
+			if *isSchedule {
+				schedule(client, api, credentials, pipeline.Name)
 			}
 		}
 	}
