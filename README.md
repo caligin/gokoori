@@ -29,6 +29,9 @@ The file is in JSON format and should contain an object with the fields `usernam
 
 #### Filters
 - `--name <regex>`: applies a regex filter by pipeline name.
+- `--groupname <regex>`: applies a regex filter by pipeline group name.
+- `--failed`: matches failed pipelines only.
+- `--paused`: matches paused pipelines only.
 
 #### Config
 - `--reason <reason>`: specifies a reason to use for the `--pause` action. Ignored when `--pause` is not specified.
