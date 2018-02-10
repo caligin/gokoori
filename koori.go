@@ -16,15 +16,57 @@ import (
 
 const credentialsFileRelative = ".gokoori/credentials"
 
-type Pipeline struct {
-	Name string
-	// and other things ignored for now
+//// dashboard unmarshalling types
+
+type Dashboard struct {
+	Embedded DashboardEmbedded `json:"_embedded"`
+}
+
+type DashboardEmbedded struct {
+	PipelineGroups []PipelineGroup `json:"pipeline_groups"`
 }
 
 type PipelineGroup struct {
-	Name      string
+	Name string
+	Embedded PipelineGroupEmbedded `json:"_embedded"`
+}
+
+type PipelineGroupEmbedded struct {
 	Pipelines []Pipeline
 }
+
+type Pipeline struct {
+	Name string
+	Locked bool
+	PauseInfo PauseInfo `json:"pause_info"`
+	Embedded PipelineEmbedded
+}
+
+type PauseInfo struct {
+	Paused bool
+	PausedBy string `json:"paused_by"`
+	PauseReason string `json:"pause_reason"`
+}
+
+type PipelineEmbedded struct {
+	Instances []PipelineInstance
+}
+
+type PipelineInstance struct {
+	Label string
+	Embedded PipelineInstanceEmbedded `json:"_embedded"`
+}
+
+type PipelineInstanceEmbedded struct {
+	Stages []PipelineStage
+}
+
+type PipelineStage struct {
+	Name string
+	Status string
+}
+
+//// holder types
 
 type GoApi struct {
 	Protocol string
@@ -36,6 +78,7 @@ type Credentials struct {
 	Username string
 	Password string
 }
+
 
 func pause(client *http.Client, api GoApi, credentials *Credentials, pipeline string, reason string) {
 	// TODO make sure reason has the proper encoding? req splitting? (but impact?? like, nope really)
@@ -74,32 +117,52 @@ func unpause(client *http.Client, api GoApi, credentials *Credentials, pipeline 
 	}
 }
 
-func listGroups(client *http.Client, api GoApi, credentials *Credentials) []PipelineGroup {
-	req, makeReqErr := http.NewRequest("GET", fmt.Sprintf("%s://%s:%d/go/api/config/pipeline_groups", api.Protocol, api.Host, api.Port), nil)
+func schedule(client *http.Client, api GoApi, credentials *Credentials, pipeline string) {
+	// TODO make sure reason has the proper encoding? req splitting? (but impact?? like, nope really)
+	req, makeReqErr := http.NewRequest("POST", fmt.Sprintf("%s://%s:%d/go/api/pipelines/%s/schedule", api.Protocol, api.Host, api.Port, pipeline), nil)
 	if makeReqErr != nil {
-		log.Fatalf("error creating list pipeline error: %s", makeReqErr.Error())
+		log.Fatalf("error creating schedule req for %s: %s", pipeline, makeReqErr.Error())
 	}
+	req.Header.Add("Confirm", "true")
 	if credentials != nil {
 		req.SetBasicAuth(credentials.Username, credentials.Password)
 	}
-	pgResp, pgErr := client.Do(req)
-	if pgErr != nil {
-		log.Fatalf("error getting pipeline groups: ", pgErr.Error())
+	scheduleResp, scheduleErr := client.Do(req)
+	if scheduleErr != nil {
+		log.Fatalf("error scheduling %s: %s", pipeline, scheduleErr.Error())
 	}
-	if pgResp.StatusCode != 200 {
-		log.Fatalf("failed listing pipeline groups, expected 200 got %d", pgResp.StatusCode)
+	if scheduleResp.StatusCode != 202 {
+		log.Fatalf("failed scheduling %s, expected 202 got %d", pipeline, scheduleResp.StatusCode)
 	}
-	defer pgResp.Body.Close()
-	pgBody, pgBodyReadErr := ioutil.ReadAll(pgResp.Body)
-	if pgBodyReadErr != nil {
-		log.Fatalf("error reading pipeline groups: %s", pgBodyReadErr.Error())
+}
+
+func dashboard(client *http.Client, api GoApi, credentials *Credentials) Dashboard {
+	req, makeReqErr := http.NewRequest("GET", fmt.Sprintf("%s://%s:%d/go/api/dashboard", api.Protocol, api.Host, api.Port), nil)
+	if makeReqErr != nil {
+		log.Fatalf("error creating list pipeline error: %s", makeReqErr.Error())
 	}
-	var pipelineGroups []PipelineGroup
-	pgUnmarshalErr := json.Unmarshal(pgBody, &pipelineGroups)
-	if pgUnmarshalErr != nil {
-		log.Fatalf("error unmarshaling pipeline groups: %s", pgUnmarshalErr.Error())
+	req.Header.Add("Accept", "application/vnd.go.cd.v1+json")
+	if credentials != nil {
+		req.SetBasicAuth(credentials.Username, credentials.Password)
 	}
-	return pipelineGroups
+	dashboardResp, dashboardErr := client.Do(req)
+	if dashboardErr != nil {
+		log.Fatalf("error getting dashboard: ", dashboardErr.Error())
+	}
+	if dashboardResp.StatusCode != 200 {
+		log.Fatalf("failed retrieving dashboard, expected 200 got %d", dashboardResp.StatusCode)
+	}
+	defer dashboardResp.Body.Close()
+	dashboardBody, dashboardBodyReadErr := ioutil.ReadAll(dashboardResp.Body)
+	if dashboardBodyReadErr != nil {
+		log.Fatalf("error reading dashboard: %s", dashboardBodyReadErr.Error())
+	}
+	var dashboard Dashboard
+	dashboardUnmarshalErr := json.Unmarshal(dashboardBody, &dashboard)
+	if dashboardUnmarshalErr != nil {
+		log.Fatalf("error unmarshaling dashboard: %s", dashboardUnmarshalErr.Error())
+	}
+	return dashboard
 }
 
 func readCredentials() *Credentials {
@@ -130,6 +193,7 @@ func main() {
 
 	var isPause = flag.Bool("pause", false, "Unpause matching pipelines")
 	var isUnpause = flag.Bool("unpause", false, "Unpause matching pipelines")
+	var isSchedule = flag.Bool("schedule", false, "Schedule matching pipelines")
 
 	var nameFilter = flag.String("name", ".+", "Filter by pipeline name (regex)")
 	var reason = flag.String("reason", "Paused by Gokoori", "Reason for pausing")
@@ -139,6 +203,7 @@ func main() {
 
 	flag.Parse()
 	if *isPause && *isUnpause {
+		// TODO and how does trigger interact with this???? pause and trigger is not sound but unpause and schedule kinda is
 		log.Fatalf("Both pause and unpause are specified, those two options cannot be used together")
 	}
 	if *insecure && (*port == defaultHttpsPort) {
@@ -155,10 +220,10 @@ func main() {
 
 	credentials := readCredentials()
 
-	pipelineGroups := listGroups(client, api, credentials)
+	dashboard := dashboard(client, api, credentials)
 
-	for _, group := range pipelineGroups {
-		for _, pipeline := range group.Pipelines {
+	for _, group := range dashboard.Embedded.PipelineGroups {
+		for _, pipeline := range group.Embedded.Pipelines {
 			match, matchErr := regexp.MatchString(*nameFilter, pipeline.Name)
 			if matchErr != nil {
 				log.Fatalf("error regexing %s: %s", pipeline.Name, matchErr)
@@ -170,6 +235,9 @@ func main() {
 				}
 				if *isPause {
 					pause(client, api, credentials, pipeline.Name, *reason)
+				}
+				if *isSchedule {
+					schedule(client, api, credentials, pipeline.Name)
 				}
 			}
 		}

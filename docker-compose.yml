@@ -1,0 +1,18 @@
+version: '3'
+services:
+  gocd-server:
+    image: gocd/gocd-server:v18.1.0
+    ports:
+    - "8153:8153"
+    volumes:
+    - ./cruise-config.xml:/godata/config/cruise-config.xml
+    - ./go-users:/godata/config/go-users
+  gocd-agent:
+    image: gocd/gocd-agent-alpine-3.7:v18.1.0
+    links:
+    - gocd-server
+    environment:
+      - GO_SERVER_URL=https://gocd-server:8154/go
+      - AGENT_AUTO_REGISTER_KEY=43a37dc1-6cb4-4b18-836d-5bb08067b2df
+      - AGENT_AUTO_REGISTER_ENVIRONMENTS=training,prod,staging
+      - AGENT_AUTO_REGISTER_HOSTNAME=gocd-agent

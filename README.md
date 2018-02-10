@@ -25,6 +25,7 @@ The file is in JSON format and should contain an object with the fields `usernam
 #### Actions
 - `--pause`: will pause all matching pipelines with the reason speacified in the `--reason` option (or the default one). Cannot be used in conjunction with `--unpause`.
 - `--unpause`: will unpause all matching pipelines. Cannot be used in conjunction with `--pause`.
+- `--schedule`: will schedule all matching pipelines.
 
 #### Filters
 - `--name <regex>`: applies a regex filter by pipeline name.
@@ -51,3 +52,5 @@ The file is in JSON format and should contain an object with the fields `usernam
 ## TODOs
 
 - tests. doing none for now was 100% a conscious decision
+- credentials from file should not be a thing, explore oauth token feature of go
+- `--status` flag? print current job status? (failed|passed|building)

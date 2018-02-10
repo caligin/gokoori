@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<cruise xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="cruise-config.xsd" schemaVersion="89">
-  <server artifactsdir="artifacts" agentAutoRegisterKey="123456789abcdef" commandRepositoryLocation="default" serverId="c252898c-10dd-4315-aeb9-5338e88da4bf">
+<cruise xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="cruise-config.xsd" schemaVersion="104">
+  <server artifactsdir="artifacts" agentAutoRegisterKey="43a37dc1-6cb4-4b18-836d-5bb08067b2df" webhookSecret="581952b4-7ccf-473a-b94f-1687aad385cb" commandRepositoryLocation="default" serverId="4a8a66f2-9cb0-40b1-b10f-a42ea88b1571" tokenGenerationKey="41539534-92fa-4505-a02d-e87b934eaa7d">
     <security>
-      <passwordFile path="/etc/go/go-users" />
-      <roles>
-        <role name="pauser">
-          <users>
-            <user>user</user>
-          </users>
-        </role>
-      </roles>
+      <authConfigs>
+        <authConfig id="file" pluginId="cd.go.authentication.passwordfile">
+          <property>
+            <key>PasswordFilePath</key>
+            <value>/godata/config/go-users</value>
+          </property>
+        </authConfig>
+      </authConfigs>
     </security>
   </server>
   <pipelines group="asd">
@@ -46,7 +46,7 @@
     </pipeline>
   </pipelines>
   <pipelines group="somethingsomethingtrainingside">
-    <pipeline name="blah-training" isLocked="false">
+    <pipeline name="blah-training" lockBehavior="none">
       <materials>
         <svn url="asasd/nope" username="" />
       </materials>
@@ -82,21 +82,32 @@
           <value>tra</value>
         </variable>
       </environmentvariables>
+      <agents>
+        <physical uuid="d5b712fc-8d1e-4906-a2ea-d42c5f040d32" />
+      </agents>
       <pipelines>
         <pipeline name="asd-training" />
         <pipeline name="blah-training" />
       </pipelines>
     </environment>
     <environment name="prod">
+      <agents>
+        <physical uuid="d5b712fc-8d1e-4906-a2ea-d42c5f040d32" />
+      </agents>
       <pipelines>
         <pipeline name="wqdwwqd-prod" />
       </pipelines>
     </environment>
     <environment name="staging">
+      <agents>
+        <physical uuid="d5b712fc-8d1e-4906-a2ea-d42c5f040d32" />
+      </agents>
       <pipelines>
         <pipeline name="asdasd-sta" />
       </pipelines>
     </environment>
   </environments>
+  <agents>
+    <agent hostname="gocd-agent" ipaddress="172.18.0.3" uuid="d5b712fc-8d1e-4906-a2ea-d42c5f040d32" />
+  </agents>
 </cruise>
-
